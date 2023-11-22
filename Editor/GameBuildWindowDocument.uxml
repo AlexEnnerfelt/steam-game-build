@@ -1,0 +1,60 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Assets/Scripts/Carnage/Editor/Build/buildwindow-styles.uss?fileID=7433441132597879392&amp;guid=36e57e280f8be10409ff5fed4d9d0864&amp;type=3#buildwindow-styles" />
+    <ui:Label tabindex="-1" text="Build Game" display-tooltip-when-elided="true" style="-unity-text-align: upper-center; font-size: 24px;" />
+    <ui:VisualElement style="flex-grow: 0; flex-direction: row; justify-content: center;">
+        <ui:Label tabindex="-1" text="Version: " display-tooltip-when-elided="false" enable-rich-text="true" parse-escape-sequences="true" focusable="false" style="color: rgb(137, 137, 137);" />
+        <ui:Label tabindex="-1" text="0.10.52-feture/gfgf" display-tooltip-when-elided="true" name="version-label" style="color: rgb(255, 208, 136);" />
+    </ui:VisualElement>
+    <ui:VisualElement name="build-paths" style="flex-grow: 0; margin-top: 10px; margin-bottom: 10px;">
+        <ui:Label tabindex="-1" text="Build Paths" display-tooltip-when-elided="true" style="-unity-font-style: bold; font-size: 18px;" />
+        <ui:VisualElement name="path-demo" style="flex-grow: 0; flex-direction: row;">
+            <ui:TextField picking-mode="Ignore" label="Demo" style="flex-grow: 1;" />
+            <ui:Toggle />
+        </ui:VisualElement>
+        <ui:VisualElement name="path-playtest" style="flex-grow: 0; flex-direction: row;">
+            <ui:TextField picking-mode="Ignore" label="Playtest" style="flex-grow: 1;" />
+            <ui:Toggle />
+        </ui:VisualElement>
+        <ui:VisualElement name="path-release" style="flex-grow: 0; flex-direction: row;">
+            <ui:TextField picking-mode="Ignore" label="Release" style="flex-grow: 1;" />
+            <ui:Toggle />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="steam-login" style="flex-grow: 1;">
+        <ui:Label tabindex="-1" text="Steam Login" display-tooltip-when-elided="true" style="font-size: 18px; -unity-font-style: bold;" />
+        <ui:VisualElement style="flex-grow: 1; align-self: flex-start; width: 300px;">
+            <ui:TextField picking-mode="Ignore" label="Username" password="false" name="username" />
+            <ui:TextField picking-mode="Ignore" label="Password" hide-placeholder-on-focus="false" is-delayed="false" readonly="false" mask-character="*" password="true" name="password" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="app-ids" style="flex-grow: 0; flex-direction: row; justify-content: space-between; margin-bottom: 3px; align-self: stretch;" />
+    <ui:VisualElement style="flex-grow: 0; flex-direction: column; justify-content: flex-end; align-self: auto; align-items: flex-start;">
+        <ui:VisualElement style="flex-grow: 1; flex-direction: row; justify-content: space-between; align-items: center; align-self: stretch;">
+            <ui:VisualElement style="flex-grow: 0;">
+                <ui:UnsignedIntegerField label="AppID" value="42" name="appid-playtest" class="appid-field" />
+                <ui:Button text="Build Playtest" display-tooltip-when-elided="true" name="button-playtest" class="build-button">
+                    <ui:Toggle style="position: absolute; align-self: center; right: 2px;" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:VisualElement style="flex-grow: 0;">
+                <ui:UnsignedIntegerField label="AppID" value="42" name="appid-demo" class="appid-field" />
+                <ui:Button text="Build Demo" display-tooltip-when-elided="true" name="button-demo" class="build-button">
+                    <ui:Toggle style="position: absolute; align-self: center; right: 2px;" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:VisualElement style="flex-grow: 0;">
+                <ui:UnsignedIntegerField label="AppID" value="42" name="appid-release" class="appid-field" />
+                <ui:Button text="Build Release" display-tooltip-when-elided="true" name="button-release" class="build-button">
+                    <ui:Toggle style="position: absolute; align-self: center; right: 2px;" />
+                </ui:Button>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Button text="Build All" display-tooltip-when-elided="true" name="button_build-all" style="height: 24px; align-self: stretch; align-items: center; justify-content: center;">
+            <ui:Toggle style="position: absolute; align-self: center; right: 2px;" />
+        </ui:Button>
+    </ui:VisualElement>
+    <ui:VisualElement name="progress" style="flex-grow: 0; margin-top: 10px; margin-bottom: 5px;">
+        <ui:ProgressBar value="1" name="build-progress" high-value="6" />
+        <ui:Label tabindex="-1" text="Active Tasks: " display-tooltip-when-elided="true" name="build-tasks" style="align-self: center; font-size: 10px;" />
+    </ui:VisualElement>
+</ui:UXML>

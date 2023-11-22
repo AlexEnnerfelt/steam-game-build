@@ -1,0 +1,23 @@
+{
+  "name": "com.punop.steam-build-editor",
+  "version": "0.1.0",
+  "displayName": "Steam Game Build",
+  "unity": "2023.1",
+  "unityRelease": "0b5",
+  "documentationUrl": "",
+  "changelogUrl": "",
+  "licensesUrl": "",
+  "keywords": [
+    "Editor"
+  ],
+  "author": {
+    "name": "Alex Ennerfelt",
+    "email": "alex.ennerfelt@gmail.com",
+    "url": "https://github.com/AlexEnnerfelt"
+  },
+  "description": "",
+
+  "dependencies": {
+    
+  }
+}

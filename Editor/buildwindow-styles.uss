@@ -1,0 +1,24 @@
+:root {
+    height: 100%;
+    width: 100%;
+    padding-top: 2px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+    align-items: stretch;
+}
+
+.build-button {
+    width: 124px;
+    height: 25px;
+    min-width: 100px;
+    flex-direction: row;
+    justify-content: flex-end;
+    padding-right: 33px;
+}
+
+.appid-field {
+    flex-direction: column;
+    width: 100px;
+    align-self: center;
+}
