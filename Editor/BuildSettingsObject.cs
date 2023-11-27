@@ -1,16 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using HeathenEngineering.SteamworksIntegration;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using UnityEngine.Events;
 using static Carnage.BuildEditor.GameBuildPipeline;
 
 namespace Carnage.BuildEditor {
 	public class BuildSettingsObject : ScriptableObject, IActiveBuildTargetChanged, IPreprocessBuildWithReport, IPostprocessBuildWithReport {
-		[field: SerializeField]
-		public SteamSettings SteamSettings { get; private set; }
 		[field: SerializeField]
 		public string SteamContentBuilder { get; private set; }
 		[field: SerializeField]
@@ -20,6 +18,9 @@ namespace Carnage.BuildEditor {
 		public List<BuildTask> buildTasks { get; set; }
 		[field: SerializeField]
 		public List<string> steamBuildScripts { get; set; }
+		public UnityEvent<uint> appIdChanged;
+
+
 		public bool HasWaitingTasks {
 			get {
 				foreach (var item in buildTasks) {
@@ -81,7 +82,7 @@ namespace Carnage.BuildEditor {
 		[field: SerializeField]
 		public string assetBundleManifestPath { get; set; }
 		[field: SerializeField]
-		public MapData[] includedMaps;
+		public string[] includedMaps;
 		[field: SerializeField]
 		public PlatformOptions[] Platforms { get; set; }
 
@@ -103,21 +104,7 @@ namespace Carnage.BuildEditor {
 			[field: SerializeField]
 			public string[] extraScriptingDefines { get; set; }
 		}
-		public string[] scenes {
-			get {
-				var scenes = new List<string> {
-					MapData.k_BootstrapScenePath,
-					MapData.k_GameScenePath
-				};
-				foreach (var item in includedMaps) {
-					foreach (var i in item.GetScenePaths()) {
-						scenes.Add(i);
-					}
-				}
-
-				return scenes.ToArray();
-			}
-		}
+		public string[] Scenes => includedMaps;
 		public BuildPlayerOptions[] GetBuildOptions() {
 			var options = new List<BuildPlayerOptions>();
 			foreach (var opt in Platforms) {
@@ -127,7 +114,7 @@ namespace Carnage.BuildEditor {
 					options = opt.options,
 					assetBundleManifestPath = assetBundleManifestPath,
 					extraScriptingDefines = opt.extraScriptingDefines,
-					scenes = scenes,
+					scenes = Scenes,
 					subtarget = opt.subtarget,
 					targetGroup = opt.targetGroup
 				};
@@ -200,5 +187,10 @@ namespace Carnage.BuildEditor {
 		public string executableName;
 		public string steamAppScriptLocation;
 		public uint appId;
+	}
+	public enum GameBuildContentType {
+		Release = 0,
+		Demo = 1,
+		Playtest = 2
 	}
 }

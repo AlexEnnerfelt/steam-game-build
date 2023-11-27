@@ -29,7 +29,9 @@ namespace Carnage.BuildEditor {
 			SavePersistentValues();
 		}
 		public void CreateGUI() {
-			var visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.punop.steam-build-editor/Editor/GameBuildWindowDocument.uxml");
+			GameBuildPipeline.FindSettings();
+
+			var visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.ennerfelt.steam-build-editor/Editor/GameBuildWindowDocument.uxml");
 			var visualTree = visualTreeAsset.Instantiate();
 			rootVisualElement.Add(visualTree);
 
@@ -147,6 +149,7 @@ namespace Carnage.BuildEditor {
 			EditorUtility.SetDirty(SteamLoginInfo.current);
 			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.current);
 			AssetDatabase.SaveAssetIfDirty(SteamLoginInfo.current);
+			AssetDatabase.Refresh();
 			//TODO Make this reimport so the values stay 
 
 		}

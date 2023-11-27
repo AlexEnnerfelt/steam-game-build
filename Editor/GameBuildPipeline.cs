@@ -52,6 +52,17 @@ namespace Carnage.BuildEditor {
 
 			EditorApplication.quitting += ClearBuildTasks;
 		}
+		public static void FindSettings() {
+			if (BuildSettingsObject.current == null) {
+				var settingsAsset = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(BuildSettingsObject.settingsPath);
+				BuildSettingsObject.current = settingsAsset;
+
+			}
+			if (SteamLoginInfo.current == null) {
+				var steamlogin = AssetDatabase.LoadAssetAtPath<SteamLoginInfo>(SteamLoginInfo.k_Path);
+				SteamLoginInfo.current = steamlogin;
+			}
+		}
 
 		private static void ClearBuildTasks() {
 			if (BuildSettingsObject.current.HasWaitingTasks) {
@@ -199,10 +210,7 @@ namespace Carnage.BuildEditor {
 			}
 		}
 		private static void SetSteamSettings(uint steamAppId) {
-			var settings = BuildSettingsObject.current.SteamSettings;
-			settings.applicationId = new(steamAppId);
-			EditorUtility.SetDirty(settings);
-			AssetDatabase.SaveAssetIfDirty(settings);
+			BuildSettingsObject.current.appIdChanged.Invoke(steamAppId);
 		}
 		private static void SetUpTasks(BuildConfiguration[] buildOptions) {
 			var tasks = new List<BuildTask>();
