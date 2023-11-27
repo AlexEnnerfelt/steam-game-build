@@ -38,6 +38,9 @@ namespace Carnage.BuildEditor {
 
 		public const string settingsPath = "Assets/Editor/GameBuildSettings.asset";
 		public static BuildSettingsObject current;
+		public void OnEnable() {
+			current = this;
+		}
 		public int callbackOrder => 1000;
 
 		public void ClearTasks() {

@@ -9,6 +9,7 @@ namespace Carnage.BuildEditor {
 	public class BuildGameWindowEditor : EditorWindow {
 		[MenuItem("Window/Game Build Window")]
 		private static void ShowWindow() {
+
 			var window = GetWindow<BuildGameWindowEditor>();
 			window.minSize = new(430, 650);
 			window.maxSize = new(430, 650);
@@ -29,7 +30,7 @@ namespace Carnage.BuildEditor {
 			SavePersistentValues();
 		}
 		public void CreateGUI() {
-			GameBuildPipeline.FindSettings();
+			GameBuildPipeline.VerifyAssets();
 
 			var visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.ennerfelt.steam-build-editor/Editor/GameBuildWindowDocument.uxml");
 			var visualTree = visualTreeAsset.Instantiate();
@@ -61,13 +62,15 @@ namespace Carnage.BuildEditor {
 			var steamLoginRoot = rootVisualElement.Q<VisualElement>("steam-login");
 			var username = steamLoginRoot.Q<TextField>("username");
 			var password = steamLoginRoot.Q<TextField>("password");
-			username.SetValueWithoutNotify(SteamLoginInfo.current.username);
+
+			username.SetValueWithoutNotify(EditorPrefs.GetString(GameBuildPipeline.k_SteamUsername));
 			username.RegisterValueChangedCallback(e => {
-				SteamLoginInfo.current.username = e.newValue;
+				EditorPrefs.SetString(GameBuildPipeline.k_SteamUsername, e.newValue);
 			});
-			password.SetValueWithoutNotify(SteamLoginInfo.current.password);
+			password.SetValueWithoutNotify(EditorPrefs.GetString(GameBuildPipeline.k_SteamPassword));
 			password.RegisterValueChangedCallback(e => {
-				SteamLoginInfo.current.password = e.newValue;
+				EditorPrefs.SetString(GameBuildPipeline.k_SteamPassword, e.newValue);
+
 			});
 		}
 		void SetupButtons() {
@@ -146,9 +149,9 @@ namespace Carnage.BuildEditor {
 		}
 		void SavePersistentValues() {
 			EditorUtility.SetDirty(BuildSettingsObject.current);
-			EditorUtility.SetDirty(SteamLoginInfo.current);
+			//EditorUtility.SetDirty(SteamLoginInfo.current);
 			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.current);
-			AssetDatabase.SaveAssetIfDirty(SteamLoginInfo.current);
+			//AssetDatabase.SaveAssetIfDirty(SteamLoginInfo.current);
 			AssetDatabase.Refresh();
 			//TODO Make this reimport so the values stay 
 

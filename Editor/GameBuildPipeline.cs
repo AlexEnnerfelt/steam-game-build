@@ -31,36 +31,24 @@ namespace Carnage.BuildEditor {
 
 		internal static BuildTarget currentTarget => EditorUserBuildSettings.activeBuildTarget;
 		internal const string k_AppIdFilename = "steam_appid.txt";
+		internal const string k_SteamUsername = "steam_username";
+		internal const string k_SteamPassword = "steam_password";
 
 		public static event Action OnBuildProgressChanged;
 		private static CancellationTokenSource _cts;
 		static GameBuildPipeline() {
-			var settingsAsset = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(BuildSettingsObject.settingsPath);
-			if (settingsAsset == null) {
-				AssetDatabase.CreateAsset(ScriptableObject.CreateInstance(typeof(BuildSettingsObject)), BuildSettingsObject.settingsPath);
-				settingsAsset = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(BuildSettingsObject.settingsPath);
-			}
-			BuildSettingsObject.current = settingsAsset;
-
-			var steamlogin = AssetDatabase.LoadAssetAtPath<SteamLoginInfo>(SteamLoginInfo.k_Path);
-			if (steamlogin == null) {
-				AssetDatabase.CreateAsset(ScriptableObject.CreateInstance(typeof(SteamLoginInfo)), SteamLoginInfo.k_Path);
-				steamlogin = AssetDatabase.LoadAssetAtPath<SteamLoginInfo>(SteamLoginInfo.k_Path);
-			}
-			SteamLoginInfo.current = steamlogin;
-			StartBuildTasks();
-
 			EditorApplication.quitting += ClearBuildTasks;
+			StartBuildTasks();
 		}
-		public static void FindSettings() {
+
+		public static void VerifyAssets() {
 			if (BuildSettingsObject.current == null) {
 				var settingsAsset = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(BuildSettingsObject.settingsPath);
+				if (settingsAsset == null) {
+					AssetDatabase.CreateAsset(ScriptableObject.CreateInstance(typeof(BuildSettingsObject)), BuildSettingsObject.settingsPath);
+					settingsAsset = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(BuildSettingsObject.settingsPath);
+				}
 				BuildSettingsObject.current = settingsAsset;
-
-			}
-			if (SteamLoginInfo.current == null) {
-				var steamlogin = AssetDatabase.LoadAssetAtPath<SteamLoginInfo>(SteamLoginInfo.k_Path);
-				SteamLoginInfo.current = steamlogin;
 			}
 		}
 
@@ -81,7 +69,6 @@ namespace Carnage.BuildEditor {
 			ChangeAppDescription(BuildSettingsObject.current.Builds[0]);
 			PrepareBuildScripts(BuildSettingsObject.current.Builds);
 		}
-
 		internal async static void RequestBuild(BuildConfiguration[] buildOptions) {
 			ClearTasks();
 			SetUpTasks(buildOptions);
@@ -102,6 +89,7 @@ namespace Carnage.BuildEditor {
 
 		private static async void StartBuildTasks() {
 			_cts = new();
+			VerifyAssets();
 			if (BuildSettingsObject.current.HasWaitingTasks) {
 				var tasks = GetBuildTasksForPlatform(currentTarget);
 				OnBuildProgressChanged?.Invoke();
@@ -248,7 +236,7 @@ namespace Carnage.BuildEditor {
 				return;
 			}
 			var cli = BuildSettingsObject.current.BuilderExecutable;
-			var loginArgs = $" +login {SteamLoginInfo.current.username} {SteamLoginInfo.current.password}";
+			var loginArgs = $" +login {EditorPrefs.GetString(k_SteamUsername)} {EditorPrefs.GetString(k_SteamPassword)}";
 			string buildArguments = null;
 			foreach (var buildScript in BuildSettingsObject.current.steamBuildScripts) {
 				buildArguments += $" +run_app_build {buildScript}";
