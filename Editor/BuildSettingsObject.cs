@@ -16,22 +16,9 @@ namespace Carnage.BuildEditor {
 		private string builderExecutable { get; set; }
 		public BuildConfiguration[] Builds;
 		[field: SerializeField]
-		public List<BuildTask> buildTasks { get; set; }
-		[field: SerializeField]
 		public List<string> steamBuildScripts { get; set; }
 		public UnityEvent<uint> appIdChanged;
 
-
-		public bool HasWaitingTasks {
-			get {
-				foreach (var item in buildTasks) {
-					if (item.IsUnfinished) {
-						return true;
-					}
-				}
-				return false;
-			}
-		}
 		/// <summary>
 		/// The full path of where the steam cli executable is located
 		/// </summary>
@@ -64,9 +51,6 @@ namespace Carnage.BuildEditor {
 		}
 		public int callbackOrder => int.MaxValue;
 
-		public void ClearTasks() {
-			buildTasks.Clear();
-		}
 		public BuildConfiguration GetBuildPlayerOptions(GameBuildContentType type) {
 			foreach (var build in Builds) {
 				if (build.ContentType == type) {
@@ -95,22 +79,15 @@ namespace Carnage.BuildEditor {
 		public GameBuildContentType ContentType { get; set; }
 
 		[Header("Steam Settings")]
-		[SerializeField]
-		public bool uploadOnBuild;
-		[field: SerializeField]
-		public uint SteamAppId { get; set; }
-		[SerializeField]
-		private string AppBuildScriptLocation;
-		[field: SerializeField]
-		public string locationPathName { get; set; }
-		[field: SerializeField]
-		public string assetBundleManifestPath { get; set; }
+		[SerializeField] public bool uploadOnBuild;
+		[field: SerializeField] public uint SteamAppId { get; set; }
+		[SerializeField] private string AppBuildScriptLocation;
+		[field: SerializeField] public string locationPathName { get; set; }
+		[field: SerializeField] public string assetBundleManifestPath { get; set; }
 		[field: SerializeField]
 		public string[] includedMaps;
-		[field: SerializeField]
-		public string[] extraScriptingDefines { get; set; }
-		[field: SerializeField]
-		public PlatformOptions[] Platforms { get; set; }
+		[field: SerializeField] public string[] extraScriptingDefines { get; set; }
+		[field: SerializeField] public PlatformOptions[] Platforms { get; set; }
 
 		public string AppBuildScriptPath => $"{BuildSettingsObject.Current.SteamContentBuilder}{AppBuildScriptLocation}";
 		public string GetFullPath(BuildTarget target) => $"{BuildSettingsObject.Current.SteamContentBuilder}/{locationPathName}/{buildPlatformSubfolderPaths[target]}/{executableFileName[target]}";
@@ -153,9 +130,10 @@ namespace Carnage.BuildEditor {
 	/// </summary>
 	[Serializable]
 	public class BuildTask : IEquatable<BuildPlayerOptions> {
-		public BuildTask(BuildPlayerOptions opt, AdditionalBuildData add) {
+		public BuildTask(BuildPlayerOptions opt, AdditionalBuildData add, string taskName = "default") {
+			name = taskName;
 			data = add;
-			status = BuildTaskStatus.None;
+			status = BuildResult.Unknown;
 			scenes = opt.scenes;
 			locationPathName = opt.locationPathName;
 			assetBundleManifestPath = opt.assetBundleManifestPath;
@@ -179,10 +157,11 @@ namespace Carnage.BuildEditor {
 			return option;
 		}
 
-		public enum BuildTaskStatus { None, Building, Finished, Cancelled, Failed }
-		public bool IsFinished => status is BuildTaskStatus.Finished;
-		public bool IsUnfinished => status is BuildTaskStatus.None;
-		public BuildTaskStatus status = BuildTaskStatus.None;
+		public bool IsFinished => status is BuildResult.Succeeded;
+		public bool IsUnfinished => status is BuildResult.Unknown;
+		public bool IsCancelled => status is BuildResult.Cancelled;
+		public string name;
+		public BuildResult status = BuildResult.Unknown;
 		public string AppIdFilePath => $"{data.locationPathName}/{data.subfolderName}/{k_AppIdFilename}";
 		public uint AppId => data.appId;
 		public AdditionalBuildData data;

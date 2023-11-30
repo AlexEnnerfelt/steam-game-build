@@ -14,7 +14,6 @@ namespace Carnage.BuildEditor {
 			window.minSize = new(430, 650);
 			window.maxSize = new(430, 650);
 			window.titleContent = new("Game Build");
-			Debug.Log(BuildSettingsObject.Current.HasWaitingTasks);
 		}
 
 		private BuildConfiguration DemoBuild => BuildSettingsObject.Current.GetBuildPlayerOptions(GameBuildContentType.Demo);
@@ -40,21 +39,16 @@ namespace Carnage.BuildEditor {
 			SetUpAppIds();
 			SetupSteamLogin();
 			UpdateAppVersion();
-			UpdateProgressBar();
 			SavePersistentValues();
-			GameBuildPipeline.OnBuildProgressChanged += UpdateProgressBar;
 		}
 		public void OnDestroy() {
-			GameBuildPipeline.OnBuildProgressChanged -= UpdateProgressBar;
 			SavePersistentValues();
 		}
 		public void OnBecameVisible() {
 			UpdateAppVersion();
-			UpdateProgressBar();
 		}
 		public void OnFocus() {
 			UpdateAppVersion();
-			UpdateProgressBar();
 			SavePersistentValues();
 		}
 		void SetupSteamLogin() {
@@ -140,25 +134,11 @@ namespace Carnage.BuildEditor {
 				VersionLabel.text = $"{Git.BuildVersion} - {Git.Branch}";
 			} catch (NullReferenceException) { }
 		}
-		void UpdateProgressBar() {
-			try {
-				ProgressElement.style.display = BuildSettingsObject.Current.HasWaitingTasks ? DisplayStyle.Flex : DisplayStyle.None;
-				var totalTasks = BuildSettingsObject.Current.buildTasks.Count;
-				var finishedTasks = BuildSettingsObject.Current.buildTasks.Count(t => t.IsFinished);
-				BuildProgressBar.highValue = totalTasks;
-				BuildProgressBar.lowValue = 0;
-				BuildProgressBar.value = finishedTasks + 1;
-				BuildProgressBar.title = $"{finishedTasks} / {totalTasks}";
-			} catch (NullReferenceException) { }
-		}
+
 		void SavePersistentValues() {
 			EditorUtility.SetDirty(BuildSettingsObject.Current);
-			//EditorUtility.SetDirty(SteamLoginInfo.current);
 			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.Current);
-			//AssetDatabase.SaveAssetIfDirty(SteamLoginInfo.current);
 			AssetDatabase.Refresh();
-			//TODO Make this reimport so the values stay 
-
 		}
 	}
 }

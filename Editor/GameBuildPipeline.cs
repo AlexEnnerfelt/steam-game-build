@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -6,13 +7,15 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Ennerfelt.GitVersioning;
+using NUnit.Framework;
+using Unity.EditorCoroutines.Editor;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
+
 namespace Carnage.BuildEditor {
-	[InitializeOnLoad]
 	public static class GameBuildPipeline {
 		internal static readonly Dictionary<BuildTarget, string> buildPlatformSubfolderPaths = new() {
 			{BuildTarget.StandaloneLinux64, "Linux"},
@@ -24,10 +27,6 @@ namespace Carnage.BuildEditor {
 			{BuildTarget.StandaloneWindows64, "Carnage.exe"},
 			{BuildTarget.StandaloneOSX, "Mac"}
 		};
-		internal static List<BuildTask> BuildTasks {
-			get => BuildSettingsObject.Current.buildTasks;
-			private set => BuildSettingsObject.Current.buildTasks = value;
-		}
 
 		internal static BuildTarget currentTarget => EditorUserBuildSettings.activeBuildTarget;
 		internal const string k_AppIdFilename = "steam_appid.txt";
@@ -36,32 +35,12 @@ namespace Carnage.BuildEditor {
 
 		public static event Action OnBuildProgressChanged;
 		private static CancellationTokenSource _cts;
-		static GameBuildPipeline() {
-			EditorApplication.quitting += ClearBuildTasks;
-		}
 
-		private static void ClearBuildTasks() {
-			BuildSettingsObject.Current.ClearTasks();
-			EditorUtility.SetDirty(BuildSettingsObject.Current);
-			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.Current);
-			AssetDatabase.Refresh();
-		}
-
-
-		[MenuItem("Tools/Build/Prepare build Tasks")]
-		public static void PrepareTasks() {
-			ClearTasks();
-			SetUpTasks(BuildSettingsObject.Current.Builds);
-			ChangeAppDescription(BuildSettingsObject.Current.Builds[0]);
-			PrepareBuildScripts(BuildSettingsObject.Current.Builds);
-		}
-		internal async static void RequestBuild(BuildConfiguration[] buildOptions) {
-			ClearTasks();
-			SetUpTasks(buildOptions);
-			await Task.Yield();
+		internal static void RequestBuild(BuildConfiguration[] buildOptions) {
+			var tasks = SetUpTasks(buildOptions);
 			ChangeAppDescription(buildOptions);
 			PrepareBuildScripts(buildOptions);
-			StartBuildTasks();
+			EditorCoroutineUtility.StartCoroutine(BuildTasksCoroutine(tasks), BuildSettingsObject.Current);
 		}
 		private static void PrepareBuildScripts(BuildConfiguration[] buildOptions) {
 			var buildScripts = new List<string>();
@@ -73,79 +52,92 @@ namespace Carnage.BuildEditor {
 			BuildSettingsObject.Current.steamBuildScripts = buildScripts;
 		}
 
-		private static async void StartBuildTasks() {
-			_cts = new();
-			if (BuildSettingsObject.Current.HasWaitingTasks) {
-				var tasks = GetBuildTasksForPlatform(currentTarget);
-				OnBuildProgressChanged?.Invoke();
-				await Task.Yield();
+		public static IEnumerator BuildTasksCoroutine(List<BuildTask> tasks) {
+			for (var i = 0; i < Progress.GetCount(); i++) {
+				Progress.Remove(Progress.GetId(i));
+			}
 
-				while (IsBusy()) {
-					await Task.Yield();
+			//Take all the different platforms
+			var distinctPlatforms = tasks.Select(t => t.target).Distinct().ToList();
+
+			var platformProgressIds = new Dictionary<BuildTarget, int>();
+			var buildTasks = new Dictionary<BuildTarget, List<BuildTask>>();
+			var buildTaskProgressIds = new Dictionary<BuildTask, int>();
+
+			//Set up all the progressbars
+			foreach (var platform in distinctPlatforms) {
+				var id = Progress.Start($"<b>{TargetNameStrings[platform]}</b> Builds ", "Waiting to build", Progress.Options.Sticky);
+				platformProgressIds[platform] = id;
+				buildTasks[platform] = tasks.Where(t => t.target == platform).ToList();
+				foreach (var task in buildTasks[platform]) {
+					buildTaskProgressIds[task] = Progress.Start($"{task.name}", "Waiting", Progress.Options.Sticky, id);
 				}
-				//If there is not even one buildtask
-				if (tasks.Length < 1) {
-					//If there are unfinished tasks for a different target
-					if (GetTargetForUnfinishedTasks(out var target)) {
-						await SwitchTarget(target);
-						return;
+			}
+			distinctPlatforms.Reverse();
+			//Show progress
+			Progress.ShowDetails();
+			yield return new EditorWaitForSeconds(0.5f);
+
+			//Go over all of the progressbars distinct to platforms
+			foreach (var (platform, parentId) in platformProgressIds) {
+
+				//Go over all of the buildtasks
+				var index = 1;
+				foreach (var task in buildTasks[platform]) {
+					var taskProgressId = buildTaskProgressIds[task];
+					Progress.Report(parentId, index, buildTasks[platform].Count, "Building");
+
+					//Execute the actual build
+					var buildResult = Build(task);
+
+					//If it was anything other than a success, cancel the whole task
+					if (buildResult != BuildResult.Succeeded) {
+						foreach (var t in tasks) {
+							if (!t.IsFinished) {
+								Progress.Report(buildTaskProgressIds[t], 1f, "Failed");
+								Progress.Finish(buildTaskProgressIds[t], (Progress.Status)buildResult);
+							}
+						}
+
+						Progress.Finish(parentId, (Progress.Status)buildResult);
+						yield break;
 					}
-				} else {
-					Build(tasks);
+
+					Progress.Report(taskProgressId, 1f, "Finished");
+					Progress.Finish(taskProgressId, Progress.Status.Succeeded);
+
+
+					index++;
+					yield return new EditorWaitForSeconds(0.5f);
 				}
-			} else {
-				RunBatchfile();
+				Progress.Finish(parentId, Progress.Status.Succeeded);
+
 			}
+
+			RunSteamBuilder();
 		}
-		private static void Build(BuildTask[] tasks) {
-			foreach (var task in tasks) {
-				if (!_cts.IsCancellationRequested) {
-					Build(task);
-				} else {
-					return;
-				}
-			}
-			//When the currently initiated tasks are finished
-			StartBuildTasks();
-		}
-		private static void Build(BuildTask task) {
+
+		private static readonly Dictionary<BuildTarget, string> TargetNameStrings = new() {
+			{BuildTarget.StandaloneLinux64, "Linux" },
+			{BuildTarget.StandaloneWindows64, "Windows" },
+			{BuildTarget.StandaloneOSX, "OSX" },
+		};
+
+		private static BuildResult Build(BuildTask task) {
 			SetSteamSettings(task.data.appId);
 			var report = BuildPipeline.BuildPlayer(task.ToBuildPlayerOptions());
+			task.status = report.summary.result;
+			if (report.summary.result == BuildResult.Succeeded) {
+				WriteAppIdFile(task);
+			}
+			return report.summary.result;
 
-			if (report.summary.result != BuildResult.Succeeded) {
-				_cts.Cancel();
-				CancelAllTasks();
-				return;
-			}
+		}
 
-			WriteAppIdFile(task);
-			//SetBuildTaskAsFinished(task);
-			task.status = BuildTask.BuildTaskStatus.Finished;
-			OnBuildProgressChanged?.Invoke();
+		private static BuildResult BuildDebug(BuildTask task) {
+			return BuildResult.Succeeded;
 		}
-		private static async Task SwitchTarget(BuildTarget target) {
-			EditorUtility.SetDirty(BuildSettingsObject.Current);
-			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.Current);
-			AssetDatabase.Refresh();
-			while (IsBusy()) {
-				await Task.Yield();
-			}
-			EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, target);
-			while (IsBusy()) {
-				await Task.Yield();
-			}
-		}
-		private static void CancelAllTasks() {
-			foreach (var item in BuildTasks) {
-				if (!item.IsFinished) {
-					item.status = BuildTask.BuildTaskStatus.Cancelled;
-					Debug.Log("Cancelled by user");
-				}
-			}
-			BuildSettingsObject.Current.steamBuildScripts.Clear();
-			EditorUtility.SetDirty(BuildSettingsObject.Current);
-			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.Current);
-		}
+
 		private static void WriteAppIdFile(BuildTask task) {
 			var fileLocation = task.AppIdFilePath;
 			if (File.Exists(fileLocation)) {
@@ -171,24 +163,11 @@ namespace Carnage.BuildEditor {
 			}
 			File.WriteAllLines(build.AppBuildScriptPath, file);
 		}
-		private static bool GetTargetForUnfinishedTasks(out BuildTarget target) {
-			BuildTask task = null;
-			try {
-				task = BuildTasks.First(task => !task.IsFinished && task.target != currentTarget);
-			} catch (Exception) { }
-
-			if (task is not null) {
-				target = task.target;
-				return true;
-			} else {
-				target = default;
-				return false;
-			}
-		}
 		private static void SetSteamSettings(uint steamAppId) {
 			BuildSettingsObject.Current.appIdChanged.Invoke(steamAppId);
 		}
-		private static void SetUpTasks(BuildConfiguration[] buildOptions) {
+
+		private static List<BuildTask> SetUpTasks(BuildConfiguration[] buildOptions) {
 			var tasks = new List<BuildTask>();
 
 			foreach (var buildOptionReference in buildOptions) {
@@ -201,25 +180,14 @@ namespace Carnage.BuildEditor {
 						subfolderName = buildPlatformSubfolderPaths[buildPlayerOption.target]
 					};
 
-					tasks.Add(new(buildPlayerOption, additionalData));
+					tasks.Add(new(buildPlayerOption, additionalData, $"{buildOptionReference.Name}"));
 				}
 			}
 
-			BuildTasks = tasks;
-		}
-		private static BuildTask[] GetBuildTasksForPlatform(BuildTarget target) {
-			var task = BuildTasks.Where(t => !t.IsFinished && t.target.Equals(target));
-			return task.ToArray();
-		}
-		private static void ClearTasks() {
-			BuildTasks.Clear();
+			return tasks;
 		}
 
-		private static bool IsBusy() {
-			return BuildPipeline.isBuildingPlayer || EditorApplication.isCompiling || EditorApplication.isUpdating;
-		}
-		[MenuItem("Tools/Build/Prepare CLI Args")]
-		private static void RunBatchfile() {
+		private static void RunSteamBuilder() {
 			if (BuildSettingsObject.Current.steamBuildScripts.Count < 1) {
 				return;
 			}
@@ -234,22 +202,14 @@ namespace Carnage.BuildEditor {
 			Process.Start(cli, fullArgs);
 		}
 
-		internal static async void OnActiveBuildTargetChanged(BuildTarget previousTarget, BuildTarget newTarget) {
-			await Task.Yield();
-			while (IsBusy()) {
-				await Task.Yield();
-			}
-			await Task.Yield();
-			StartBuildTasks();
+		internal static void OnActiveBuildTargetChanged(BuildTarget previousTarget, BuildTarget newTarget) {
+
 		}
 		internal static void OnPreprocessBuild(BuildReport report) {
-			//Check current build target
-			//Set the version number correctly 
+
 		}
 		internal static void OnPostprocessBuild(BuildReport report) {
-			//Check if there are any more build taks to finish
-			//Check if they require a change to a new buildtarget
-			//Execute the task
+
 		}
 	}
 }

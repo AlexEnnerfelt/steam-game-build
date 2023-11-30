@@ -2,7 +2,8 @@
     "name": "com.ennerfelt.steam-build",
     "rootNamespace": "",
     "references": [
-        "GUID:e59adeee7b1f9d8409bf2bd8a666a7af"
+        "GUID:e59adeee7b1f9d8409bf2bd8a666a7af",
+        "GUID:478a2357cc57436488a56e564b08d223"
     ],
     "includePlatforms": [
         "Editor"
