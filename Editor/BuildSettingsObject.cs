@@ -33,6 +33,8 @@ namespace Carnage.BuildEditor {
 						Debug.Log("No build settings found, created new");
 						AssetDatabase.CreateAsset(CreateInstance(typeof(BuildSettingsObject)), settingsPath);
 						_current = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(settingsPath);
+						//Make sure it executes in editor as well
+						_current.appIdChanged.SetPersistentListenerState(0, UnityEventCallState.EditorAndRuntime);
 					} else {
 						return _current;
 					}
