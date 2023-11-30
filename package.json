@@ -18,5 +18,7 @@
   "description": "",
 
   "dependencies": {
+    "com.ennerfelt.git-versioning": "0.1.13",
+    "com.unity.editorcoroutines": "1.0.0"
   }
 }

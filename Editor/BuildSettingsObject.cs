@@ -32,6 +32,7 @@ namespace Carnage.BuildEditor {
 					if (_current == null) {
 						Debug.Log("No build settings found, created new");
 						AssetDatabase.CreateAsset(CreateInstance(typeof(BuildSettingsObject)), settingsPath);
+
 						_current = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(settingsPath);
 						//Make sure it executes in editor as well
 						_current.appIdChanged.SetPersistentListenerState(0, UnityEventCallState.EditorAndRuntime);
@@ -41,16 +42,8 @@ namespace Carnage.BuildEditor {
 				}
 				return _current;
 			}
-			private set => _current = value;
 		}
 		private static BuildSettingsObject _current;
-
-		public void OnEnable() {
-			_current = this;
-		}
-		public void OnValidate() {
-			Current = this;
-		}
 		public int callbackOrder => int.MaxValue;
 
 		public BuildConfiguration GetBuildPlayerOptions(GameBuildContentType type) {

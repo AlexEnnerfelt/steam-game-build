@@ -14,6 +14,8 @@ namespace Carnage.BuildEditor {
 			window.minSize = new(430, 650);
 			window.maxSize = new(430, 650);
 			window.titleContent = new("Game Build");
+			ValidateObject(BuildSettingsObject.Current);
+			window.CreateGUI();
 		}
 
 		private BuildConfiguration DemoBuild => BuildSettingsObject.Current.GetBuildPlayerOptions(GameBuildContentType.Demo);
@@ -30,6 +32,10 @@ namespace Carnage.BuildEditor {
 			SavePersistentValues();
 		}
 		public void CreateGUI() {
+			if (rootVisualElement == null) {
+				return;
+			}
+			rootVisualElement.Clear();
 			var visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.ennerfelt.steam-build-editor/Editor/GameBuildWindowDocument.uxml");
 			var visualTree = visualTreeAsset.Instantiate();
 			rootVisualElement.Add(visualTree);
@@ -45,9 +51,12 @@ namespace Carnage.BuildEditor {
 			SavePersistentValues();
 		}
 		public void OnBecameVisible() {
+			ValidateObject(BuildSettingsObject.Current);
+
 			UpdateAppVersion();
 		}
 		public void OnFocus() {
+			ValidateObject(BuildSettingsObject.Current);
 			UpdateAppVersion();
 			SavePersistentValues();
 		}
@@ -133,6 +142,12 @@ namespace Carnage.BuildEditor {
 			try {
 				VersionLabel.text = $"{Git.BuildVersion} - {Git.Branch}";
 			} catch (NullReferenceException) { }
+		}
+
+		static void ValidateObject(BuildSettingsObject obj) {
+			if (obj != null) {
+
+			}
 		}
 
 		void SavePersistentValues() {

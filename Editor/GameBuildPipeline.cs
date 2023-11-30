@@ -5,14 +5,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Ennerfelt.GitVersioning;
-using NUnit.Framework;
 using Unity.EditorCoroutines.Editor;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
-using UnityEngine;
-using Debug = UnityEngine.Debug;
 
 
 namespace Carnage.BuildEditor {
@@ -51,14 +47,17 @@ namespace Carnage.BuildEditor {
 			}
 			BuildSettingsObject.Current.steamBuildScripts = buildScripts;
 		}
-
 		public static IEnumerator BuildTasksCoroutine(List<BuildTask> tasks) {
 			for (var i = 0; i < Progress.GetCount(); i++) {
 				Progress.Remove(Progress.GetId(i));
 			}
 
+			var originalBuildTarget = EditorUserBuildSettings.activeBuildTarget;
+
 			//Take all the different platforms
 			var distinctPlatforms = tasks.Select(t => t.target).Distinct().ToList();
+			//Place the current platform at the top
+			distinctPlatforms = distinctPlatforms.OrderByDescending(t => t == originalBuildTarget).ToList();
 
 			var platformProgressIds = new Dictionary<BuildTarget, int>();
 			var buildTasks = new Dictionary<BuildTarget, List<BuildTask>>();
@@ -73,7 +72,7 @@ namespace Carnage.BuildEditor {
 					buildTaskProgressIds[task] = Progress.Start($"{task.name}", "Waiting", Progress.Options.Sticky, id);
 				}
 			}
-			distinctPlatforms.Reverse();
+
 			//Show progress
 			Progress.ShowDetails();
 			yield return new EditorWaitForSeconds(0.5f);
@@ -87,6 +86,11 @@ namespace Carnage.BuildEditor {
 					var taskProgressId = buildTaskProgressIds[task];
 					Progress.Report(parentId, index, buildTasks[platform].Count, "Building");
 
+					//Set the build version
+					PlayerSettings.bundleVersion = BuildVersion.GetBuildVersion(task.target, true);
+					//Set the Ap ID to the correct on in the app
+					SetSteamSettings(task.data.appId);
+					yield return new EditorWaitForSeconds(1f);
 					//Execute the actual build
 					var buildResult = Build(task);
 
@@ -96,6 +100,8 @@ namespace Carnage.BuildEditor {
 							if (!t.IsFinished) {
 								Progress.Report(buildTaskProgressIds[t], 1f, "Failed");
 								Progress.Finish(buildTaskProgressIds[t], (Progress.Status)buildResult);
+
+								SwitchToTarget(originalBuildTarget);
 							}
 						}
 
@@ -111,10 +117,17 @@ namespace Carnage.BuildEditor {
 					yield return new EditorWaitForSeconds(0.5f);
 				}
 				Progress.Finish(parentId, Progress.Status.Succeeded);
-
+				yield return new EditorWaitForSeconds(0.5f);
 			}
 
 			RunSteamBuilder();
+			SwitchToTarget(originalBuildTarget);
+		}
+
+		private static void SwitchToTarget(BuildTarget originalBuildTarget) {
+			if (EditorUserBuildSettings.activeBuildTarget != originalBuildTarget) {
+				EditorUserBuildSettings.SwitchActiveBuildTargetAsync(GetTargetGroupForTarget(originalBuildTarget), originalBuildTarget);
+			}
 		}
 
 		private static readonly Dictionary<BuildTarget, string> TargetNameStrings = new() {
@@ -124,7 +137,7 @@ namespace Carnage.BuildEditor {
 		};
 
 		private static BuildResult Build(BuildTask task) {
-			SetSteamSettings(task.data.appId);
+
 			var report = BuildPipeline.BuildPlayer(task.ToBuildPlayerOptions());
 			task.status = report.summary.result;
 			if (report.summary.result == BuildResult.Succeeded) {
@@ -211,5 +224,15 @@ namespace Carnage.BuildEditor {
 		internal static void OnPostprocessBuild(BuildReport report) {
 
 		}
+		private static BuildTargetGroup GetTargetGroupForTarget(BuildTarget target) => target switch {
+			BuildTarget.StandaloneOSX => BuildTargetGroup.Standalone,
+			BuildTarget.StandaloneWindows => BuildTargetGroup.Standalone,
+			BuildTarget.iOS => BuildTargetGroup.iOS,
+			BuildTarget.Android => BuildTargetGroup.Android,
+			BuildTarget.StandaloneWindows64 => BuildTargetGroup.Standalone,
+			BuildTarget.WebGL => BuildTargetGroup.WebGL,
+			BuildTarget.StandaloneLinux64 => BuildTargetGroup.Standalone,
+			_ => BuildTargetGroup.Unknown
+		};
 	}
 }
