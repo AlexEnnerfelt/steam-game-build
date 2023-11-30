@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -36,12 +37,32 @@ namespace Carnage.BuildEditor {
 		/// </summary>
 		public string BuilderExecutable => $"{SteamContentBuilder}{builderExecutable}";
 
-		public const string settingsPath = "Assets/Editor/GameBuildSettings.asset";
-		public static BuildSettingsObject current;
-		public void OnEnable() {
-			current = this;
+		public static string settingsPath => "Assets/Editor/GameBuildSettings.asset";
+		public static BuildSettingsObject Current {
+			get {
+				if (_current == null) {
+					_current = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(settingsPath);
+					if (_current == null) {
+						Debug.Log("No build settings found, created new");
+						AssetDatabase.CreateAsset(CreateInstance(typeof(BuildSettingsObject)), settingsPath);
+						_current = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(settingsPath);
+					} else {
+						return _current;
+					}
+				}
+				return _current;
+			}
+			private set => _current = value;
 		}
-		public int callbackOrder => 1000;
+		private static BuildSettingsObject _current;
+
+		public void OnEnable() {
+			_current = this;
+		}
+		public void OnValidate() {
+			Current = this;
+		}
+		public int callbackOrder => int.MaxValue;
 
 		public void ClearTasks() {
 			buildTasks.Clear();
@@ -87,17 +108,17 @@ namespace Carnage.BuildEditor {
 		[field: SerializeField]
 		public string[] includedMaps;
 		[field: SerializeField]
+		public string[] extraScriptingDefines { get; set; }
+		[field: SerializeField]
 		public PlatformOptions[] Platforms { get; set; }
 
-
-		public string AppBuildScriptPath => $"{BuildSettingsObject.current.SteamContentBuilder}{AppBuildScriptLocation}";
-		public string GetFullPath(BuildTarget target) => $"{BuildSettingsObject.current.SteamContentBuilder}/{locationPathName}/{buildPlatformSubfolderPaths[target]}/{executableFileName[target]}";
+		public string AppBuildScriptPath => $"{BuildSettingsObject.Current.SteamContentBuilder}{AppBuildScriptLocation}";
+		public string GetFullPath(BuildTarget target) => $"{BuildSettingsObject.Current.SteamContentBuilder}/{locationPathName}/{buildPlatformSubfolderPaths[target]}/{executableFileName[target]}";
 
 		[Serializable]
 		public class PlatformOptions {
 			[field: SerializeField]
 			public BuildTargetGroup targetGroup { get; set; }
-
 			[field: SerializeField]
 			public BuildTarget target { get; set; }
 			[field: SerializeField]
@@ -107,20 +128,21 @@ namespace Carnage.BuildEditor {
 			[field: SerializeField]
 			public string[] extraScriptingDefines { get; set; }
 		}
-		public string[] Scenes => includedMaps;
 		public BuildPlayerOptions[] GetBuildOptions() {
 			var options = new List<BuildPlayerOptions>();
 			foreach (var opt in Platforms) {
-				var option = new BuildPlayerOptions() {
-					locationPathName = GetFullPath(opt.target),
-					target = opt.target,
-					options = opt.options,
-					assetBundleManifestPath = assetBundleManifestPath,
-					extraScriptingDefines = opt.extraScriptingDefines,
-					scenes = Scenes,
-					subtarget = opt.subtarget,
-					targetGroup = opt.targetGroup
-				};
+
+				var option = new BuildPlayerOptions();
+
+				option.locationPathName = GetFullPath(opt.target);
+				option.target = opt.target;
+				option.options = opt.options;
+				option.assetBundleManifestPath = assetBundleManifestPath;
+				option.extraScriptingDefines = opt.extraScriptingDefines.Concat(extraScriptingDefines).ToArray();
+				option.scenes = includedMaps;
+				option.subtarget = opt.subtarget;
+				option.targetGroup = opt.targetGroup;
+
 				options.Add(option);
 			}
 			return options.ToArray();
@@ -143,6 +165,20 @@ namespace Carnage.BuildEditor {
 			options = opt.options;
 			extraScriptingDefines = opt.extraScriptingDefines;
 		}
+		public BuildPlayerOptions ToBuildPlayerOptions() {
+			var option = new BuildPlayerOptions();
+
+			option.locationPathName = this.locationPathName;
+			option.target = this.target;
+			option.options = this.options;
+			option.assetBundleManifestPath = assetBundleManifestPath;
+			option.extraScriptingDefines = this.extraScriptingDefines;
+			option.scenes = this.scenes;
+			option.subtarget = this.subtarget;
+			option.targetGroup = this.targetGroup;
+			return option;
+		}
+
 		public enum BuildTaskStatus { None, Building, Finished, Cancelled, Failed }
 		public bool IsFinished => status is BuildTaskStatus.Finished;
 		public bool IsUnfinished => status is BuildTaskStatus.None;
@@ -160,27 +196,17 @@ namespace Carnage.BuildEditor {
 		public string[] extraScriptingDefines;
 
 		public bool Equals(BuildPlayerOptions other) {
-			return
-				scenes.Equals(other.scenes) &&
-				locationPathName.Equals(other.locationPathName) &&
-				assetBundleManifestPath.Equals(other.assetBundleManifestPath) &&
-				targetGroup.Equals(other.targetGroup) &&
-				target.Equals(other.target) &&
-				subtarget.Equals(other.subtarget) &&
-				options.Equals(other.options) &&
-				extraScriptingDefines.Equals(other.extraScriptingDefines);
-		}
-		public static implicit operator BuildPlayerOptions(BuildTask task) {
-			return new BuildPlayerOptions {
-				scenes = task.scenes,
-				locationPathName = task.locationPathName,
-				assetBundleManifestPath = task.assetBundleManifestPath,
-				targetGroup = task.targetGroup,
-				target = task.target,
-				subtarget = task.subtarget,
-				options = task.options,
-				extraScriptingDefines = task.extraScriptingDefines
-			};
+			var cnd1 = scenes.Equals(other.scenes);
+			var cnd2 = locationPathName.Equals(other.locationPathName);
+			var cnd3 = assetBundleManifestPath.Equals(other.assetBundleManifestPath);
+			var cnd4 = targetGroup.Equals(other.targetGroup);
+			var cnd5 = target.Equals(other.target);
+			var cnd6 = subtarget.Equals(other.subtarget);
+			var cnd7 = options.Equals(other.options);
+			var cnd8 = extraScriptingDefines.Equals(other.extraScriptingDefines);
+
+			var IsEqual = cnd1 && cnd2 && cnd3 && cnd4 && cnd5 && cnd6 && cnd7 && cnd8;
+			return IsEqual;
 		}
 	}
 	[Serializable]

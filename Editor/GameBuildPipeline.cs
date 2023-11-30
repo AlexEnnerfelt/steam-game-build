@@ -25,8 +25,8 @@ namespace Carnage.BuildEditor {
 			{BuildTarget.StandaloneOSX, "Mac"}
 		};
 		internal static List<BuildTask> BuildTasks {
-			get => BuildSettingsObject.current.buildTasks;
-			private set => BuildSettingsObject.current.buildTasks = value;
+			get => BuildSettingsObject.Current.buildTasks;
+			private set => BuildSettingsObject.Current.buildTasks = value;
 		}
 
 		internal static BuildTarget currentTarget => EditorUserBuildSettings.activeBuildTarget;
@@ -38,36 +38,22 @@ namespace Carnage.BuildEditor {
 		private static CancellationTokenSource _cts;
 		static GameBuildPipeline() {
 			EditorApplication.quitting += ClearBuildTasks;
-			StartBuildTasks();
-		}
-
-		public static void VerifyAssets() {
-			if (BuildSettingsObject.current == null) {
-				var settingsAsset = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(BuildSettingsObject.settingsPath);
-				if (settingsAsset == null) {
-					AssetDatabase.CreateAsset(ScriptableObject.CreateInstance(typeof(BuildSettingsObject)), BuildSettingsObject.settingsPath);
-					settingsAsset = AssetDatabase.LoadAssetAtPath<BuildSettingsObject>(BuildSettingsObject.settingsPath);
-				}
-				BuildSettingsObject.current = settingsAsset;
-			}
 		}
 
 		private static void ClearBuildTasks() {
-			if (BuildSettingsObject.current.HasWaitingTasks) {
-				BuildSettingsObject.current.ClearTasks();
-				EditorUtility.SetDirty(BuildSettingsObject.current);
-				AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.current);
-				AssetDatabase.Refresh();
-			}
+			BuildSettingsObject.Current.ClearTasks();
+			EditorUtility.SetDirty(BuildSettingsObject.Current);
+			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.Current);
+			AssetDatabase.Refresh();
 		}
 
 
 		[MenuItem("Tools/Build/Prepare build Tasks")]
 		public static void PrepareTasks() {
 			ClearTasks();
-			SetUpTasks(BuildSettingsObject.current.Builds);
-			ChangeAppDescription(BuildSettingsObject.current.Builds[0]);
-			PrepareBuildScripts(BuildSettingsObject.current.Builds);
+			SetUpTasks(BuildSettingsObject.Current.Builds);
+			ChangeAppDescription(BuildSettingsObject.Current.Builds[0]);
+			PrepareBuildScripts(BuildSettingsObject.Current.Builds);
 		}
 		internal async static void RequestBuild(BuildConfiguration[] buildOptions) {
 			ClearTasks();
@@ -84,13 +70,12 @@ namespace Carnage.BuildEditor {
 					buildScripts.Add(item.AppBuildScriptPath);
 				}
 			}
-			BuildSettingsObject.current.steamBuildScripts = buildScripts;
+			BuildSettingsObject.Current.steamBuildScripts = buildScripts;
 		}
 
 		private static async void StartBuildTasks() {
 			_cts = new();
-			VerifyAssets();
-			if (BuildSettingsObject.current.HasWaitingTasks) {
+			if (BuildSettingsObject.Current.HasWaitingTasks) {
 				var tasks = GetBuildTasksForPlatform(currentTarget);
 				OnBuildProgressChanged?.Invoke();
 				await Task.Yield();
@@ -125,7 +110,7 @@ namespace Carnage.BuildEditor {
 		}
 		private static void Build(BuildTask task) {
 			SetSteamSettings(task.data.appId);
-			var report = BuildPipeline.BuildPlayer(task);
+			var report = BuildPipeline.BuildPlayer(task.ToBuildPlayerOptions());
 
 			if (report.summary.result != BuildResult.Succeeded) {
 				_cts.Cancel();
@@ -134,10 +119,17 @@ namespace Carnage.BuildEditor {
 			}
 
 			WriteAppIdFile(task);
-			SetBuildTaskAsFinished(task);
+			//SetBuildTaskAsFinished(task);
+			task.status = BuildTask.BuildTaskStatus.Finished;
 			OnBuildProgressChanged?.Invoke();
 		}
 		private static async Task SwitchTarget(BuildTarget target) {
+			EditorUtility.SetDirty(BuildSettingsObject.Current);
+			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.Current);
+			AssetDatabase.Refresh();
+			while (IsBusy()) {
+				await Task.Yield();
+			}
 			EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, target);
 			while (IsBusy()) {
 				await Task.Yield();
@@ -150,9 +142,9 @@ namespace Carnage.BuildEditor {
 					Debug.Log("Cancelled by user");
 				}
 			}
-			BuildSettingsObject.current.steamBuildScripts.Clear();
-			EditorUtility.SetDirty(BuildSettingsObject.current);
-			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.current);
+			BuildSettingsObject.Current.steamBuildScripts.Clear();
+			EditorUtility.SetDirty(BuildSettingsObject.Current);
+			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.Current);
 		}
 		private static void WriteAppIdFile(BuildTask task) {
 			var fileLocation = task.AppIdFilePath;
@@ -179,10 +171,6 @@ namespace Carnage.BuildEditor {
 			}
 			File.WriteAllLines(build.AppBuildScriptPath, file);
 		}
-		private static void SetBuildTaskAsFinished(BuildPlayerOptions options) {
-			var buildTask = BuildTasks.Find(c => c.Equals(options));
-			buildTask.status = BuildTask.BuildTaskStatus.Finished;
-		}
 		private static bool GetTargetForUnfinishedTasks(out BuildTarget target) {
 			BuildTask task = null;
 			try {
@@ -198,7 +186,7 @@ namespace Carnage.BuildEditor {
 			}
 		}
 		private static void SetSteamSettings(uint steamAppId) {
-			BuildSettingsObject.current.appIdChanged.Invoke(steamAppId);
+			BuildSettingsObject.Current.appIdChanged.Invoke(steamAppId);
 		}
 		private static void SetUpTasks(BuildConfiguration[] buildOptions) {
 			var tasks = new List<BuildTask>();
@@ -209,7 +197,7 @@ namespace Carnage.BuildEditor {
 					var additionalData = new AdditionalBuildData() {
 						appId = buildOptionReference.SteamAppId,
 						executableName = executableFileName[buildPlayerOption.target],
-						locationPathName = $"{BuildSettingsObject.current.SteamContentBuilder}{buildOptionReference.locationPathName}",
+						locationPathName = $"{BuildSettingsObject.Current.SteamContentBuilder}{buildOptionReference.locationPathName}",
 						subfolderName = buildPlatformSubfolderPaths[buildPlayerOption.target]
 					};
 
@@ -232,17 +220,17 @@ namespace Carnage.BuildEditor {
 		}
 		[MenuItem("Tools/Build/Prepare CLI Args")]
 		private static void RunBatchfile() {
-			if (BuildSettingsObject.current.steamBuildScripts.Count < 1) {
+			if (BuildSettingsObject.Current.steamBuildScripts.Count < 1) {
 				return;
 			}
-			var cli = BuildSettingsObject.current.BuilderExecutable;
+			var cli = BuildSettingsObject.Current.BuilderExecutable;
 			var loginArgs = $" +login {EditorPrefs.GetString(k_SteamUsername)} {EditorPrefs.GetString(k_SteamPassword)}";
 			string buildArguments = null;
-			foreach (var buildScript in BuildSettingsObject.current.steamBuildScripts) {
+			foreach (var buildScript in BuildSettingsObject.Current.steamBuildScripts) {
 				buildArguments += $" +run_app_build {buildScript}";
 			}
 			var fullArgs = $"{loginArgs}{buildArguments}";
-			BuildSettingsObject.current.steamBuildScripts.Clear();
+			BuildSettingsObject.Current.steamBuildScripts.Clear();
 			Process.Start(cli, fullArgs);
 		}
 

@@ -3,22 +3,23 @@ using System.Linq;
 using System.Text;
 using Ennerfelt.GitVersioning;
 using UnityEditor;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Carnage.BuildEditor {
 	public class BuildGameWindowEditor : EditorWindow {
 		[MenuItem("Window/Game Build Window")]
 		private static void ShowWindow() {
-
 			var window = GetWindow<BuildGameWindowEditor>();
 			window.minSize = new(430, 650);
 			window.maxSize = new(430, 650);
 			window.titleContent = new("Game Build");
+			Debug.Log(BuildSettingsObject.Current.HasWaitingTasks);
 		}
 
-		private BuildConfiguration DemoBuild => BuildSettingsObject.current.GetBuildPlayerOptions(GameBuildContentType.Demo);
-		private BuildConfiguration PlaytestBuild => BuildSettingsObject.current.GetBuildPlayerOptions(GameBuildContentType.Playtest);
-		private BuildConfiguration ReleaseBuild => BuildSettingsObject.current.GetBuildPlayerOptions(GameBuildContentType.Release);
+		private BuildConfiguration DemoBuild => BuildSettingsObject.Current.GetBuildPlayerOptions(GameBuildContentType.Demo);
+		private BuildConfiguration PlaytestBuild => BuildSettingsObject.Current.GetBuildPlayerOptions(GameBuildContentType.Playtest);
+		private BuildConfiguration ReleaseBuild => BuildSettingsObject.Current.GetBuildPlayerOptions(GameBuildContentType.Release);
 
 
 		private TextElement VersionLabel => rootVisualElement.Q<TextElement>("version-label");
@@ -30,8 +31,6 @@ namespace Carnage.BuildEditor {
 			SavePersistentValues();
 		}
 		public void CreateGUI() {
-			GameBuildPipeline.VerifyAssets();
-
 			var visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.ennerfelt.steam-build-editor/Editor/GameBuildWindowDocument.uxml");
 			var visualTree = visualTreeAsset.Instantiate();
 			rootVisualElement.Add(visualTree);
@@ -74,11 +73,16 @@ namespace Carnage.BuildEditor {
 			});
 		}
 		void SetupButtons() {
-			SetUp(rootVisualElement.Q<Button>("button_build-all"), new BuildConfiguration[] { DemoBuild, PlaytestBuild, ReleaseBuild });
-			SetUp(rootVisualElement.Q<Button>("button-demo"), new BuildConfiguration[] { DemoBuild });
-			SetUp(rootVisualElement.Q<Button>("button-playtest"), new BuildConfiguration[] { PlaytestBuild });
-			SetUp(rootVisualElement.Q<Button>("button-release"), new BuildConfiguration[] { ReleaseBuild });
+			try {
+				SetUp(rootVisualElement.Q<Button>("button_build-all"), new BuildConfiguration[] { DemoBuild, PlaytestBuild, ReleaseBuild });
+				SetUp(rootVisualElement.Q<Button>("button-demo"), new BuildConfiguration[] { DemoBuild });
+				SetUp(rootVisualElement.Q<Button>("button-playtest"), new BuildConfiguration[] { PlaytestBuild });
+				SetUp(rootVisualElement.Q<Button>("button-release"), new BuildConfiguration[] { ReleaseBuild });
 
+
+			} catch (Exception) {
+
+			}
 			void SetUp(Button button, BuildConfiguration[] triggerBuilds) {
 				var uploadToggle = button.Q<Toggle>();
 				uploadToggle.SetValueWithoutNotify(triggerBuilds[0].uploadOnBuild);
@@ -138,9 +142,9 @@ namespace Carnage.BuildEditor {
 		}
 		void UpdateProgressBar() {
 			try {
-				ProgressElement.style.display = BuildSettingsObject.current.HasWaitingTasks ? DisplayStyle.Flex : DisplayStyle.None;
-				var totalTasks = BuildSettingsObject.current.buildTasks.Count;
-				var finishedTasks = BuildSettingsObject.current.buildTasks.Count(t => t.IsFinished);
+				ProgressElement.style.display = BuildSettingsObject.Current.HasWaitingTasks ? DisplayStyle.Flex : DisplayStyle.None;
+				var totalTasks = BuildSettingsObject.Current.buildTasks.Count;
+				var finishedTasks = BuildSettingsObject.Current.buildTasks.Count(t => t.IsFinished);
 				BuildProgressBar.highValue = totalTasks;
 				BuildProgressBar.lowValue = 0;
 				BuildProgressBar.value = finishedTasks + 1;
@@ -148,9 +152,9 @@ namespace Carnage.BuildEditor {
 			} catch (NullReferenceException) { }
 		}
 		void SavePersistentValues() {
-			EditorUtility.SetDirty(BuildSettingsObject.current);
+			EditorUtility.SetDirty(BuildSettingsObject.Current);
 			//EditorUtility.SetDirty(SteamLoginInfo.current);
-			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.current);
+			AssetDatabase.SaveAssetIfDirty(BuildSettingsObject.Current);
 			//AssetDatabase.SaveAssetIfDirty(SteamLoginInfo.current);
 			AssetDatabase.Refresh();
 			//TODO Make this reimport so the values stay 
