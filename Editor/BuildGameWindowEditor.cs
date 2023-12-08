@@ -8,7 +8,7 @@ using UnityEngine.UIElements;
 
 namespace Carnage.BuildEditor {
 	public class BuildGameWindowEditor : EditorWindow {
-		[MenuItem("Window/Game Build Window")]
+		[MenuItem("File/Game Build Window", priority = 212)]
 		private static void ShowWindow() {
 			var window = GetWindow<BuildGameWindowEditor>();
 			window.minSize = new(430, 650);
